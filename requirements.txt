@@ -1,0 +1,15 @@
+streamlit>=1.22
+python-dotenv
+langchain>=0.0.200
+langchain-community
+openai
+pypdf
+beautifulsoup4
+aiohttp
+sentence-transformers
+faiss-cpu
+tqdm
+requests
+redis
+pypdfium2
+protobuf==3.20.*

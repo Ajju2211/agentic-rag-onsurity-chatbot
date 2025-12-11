@@ -1,41 +1,31 @@
 from typing import List
-from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from vector.faiss_manager import FAISSManager
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from vector.chroma_manager import ChromaManager
 import logging
 
 logger = logging.getLogger(__name__)
 
 class IngestionManager:
-    def __init__(self, channels: List, vector_manager: FAISSManager, chunk_size: int = 800, chunk_overlap: int = 150):
+    def __init__(self, channels, chroma: ChromaManager, chunk_size=800, chunk_overlap=150):
         self.channels = channels
-        self.vector_manager = vector_manager
+        self.chroma = chroma
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
-    def ingest_all(self, persist: bool = True):
-        if self.vector_manager.index_exists():
-            try:
-                return self.vector_manager.load_index().as_retriever()
-            except Exception:
-                logger.warning('Failed loading existing index, will rebuild')
+    def ingest_all(self, persist=True):
+        if self.chroma.has_index():
+            return self.chroma.get_retriever()
 
-        all_docs = []
+        docs = []
         for ch in self.channels:
             try:
-                docs = ch.load_documents()
-                logger.info('Channel %s returned %d docs', ch.name(), len(docs))
-                all_docs.extend(docs)
+                ds = ch.load_documents()
+                docs.extend(ds)
             except Exception as e:
-                logger.warning('Channel %s failed: %s', ch.name(), e)
-
-        if not all_docs:
-            raise ValueError('No documents to index')
+                logger.warning("Channel error: %s", e)
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
-        split_docs = splitter.split_documents(all_docs)
-
-        vectordb = self.vector_manager.build_index(split_docs)
-        if persist:
-            self.vector_manager.save_index(vectordb)
-        return vectordb.as_retriever()
+        chunks = splitter.split_documents(docs)
+        self.chroma.add_documents(chunks)
+        if persist: self.chroma.persist()
+        return self.chroma.get_retriever()

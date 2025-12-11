@@ -16,3 +16,4 @@ uvicorn
 fastapi
 python-multipart
 pytest
+langchain-groq

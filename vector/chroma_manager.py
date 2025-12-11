@@ -1,41 +1,37 @@
-import os
-import chromadb
-from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer
-from langchain_core.documents import Document
+from langchain_chroma import Chroma
+
 
 class ChromaManager:
-    def __init__(self, persist_directory='chroma_db', embedding_model='all-MiniLM-L6-v2'):
-        os.makedirs(persist_directory, exist_ok=True)
-        self.client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory=persist_directory))
-        self.embedding_model = SentenceTransformer(embedding_model)
-        try:
-            self.collection = self.client.get_collection("docs")
-        except:
-            self.collection = self.client.create_collection("docs")
+    def __init__(self, persist_dir, embedding_model):
+        self.embedding_model = embedding_model
 
-    def has_index(self):
-        try:
-            return self.collection.count() > 0
-        except:
-            return False
+        self.store = Chroma(
+            collection_name="insurance_docs",
+            persist_directory=persist_dir,
+            embedding_function=embedding_model,
+        )
 
     def add_documents(self, docs):
+        if not docs:
+            return
         texts = [d.page_content for d in docs]
         metas = [d.metadata for d in docs]
-        ids = [f"id_{i}" for i in range(len(docs))]
-        embs = self.embedding_model.encode(texts, convert_to_numpy=True).tolist()
-        self.collection.add(ids=ids, documents=texts, metadatas=metas, embeddings=embs)
+        self.store.add_texts(texts=texts, metadatas=metas)
 
-    def persist(self):
-        self.client.persist()
+    def search_local_only(self):
+        """Return KB-only docs from data/insurance_docs folder."""
+        try:
+            results = self.store.similarity_search("bot info", k=10)
+            filtered = [
+                d for d in results
+                if "insurance_docs" in d.metadata.get("source", "")
+            ]
+            return filtered
+        except Exception as e:
+            print("DEBUG >> search_local_only error:", e)
+            return []
 
-    def get_retriever(self, k=5):
-        def fn(query):
-            q = self.embedding_model.encode([query], convert_to_numpy=True)[0].tolist()
-            res = self.collection.query(query_embeddings=[q], n_results=k, include=["documents","metadatas"])
-            docs = []
-            for t, m in zip(res["documents"][0], res["metadatas"][0]):
-                docs.append(Document(page_content=t, metadata=m))
-            return docs
-        return fn
+    def as_retriever(self):
+        return self.store.as_retriever(
+            search_kwargs={"k": 8}
+        )  # retriever supports `.invoke()`

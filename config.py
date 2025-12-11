@@ -11,3 +11,4 @@ class Config:
     REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     STREAMLIT_PORT = int(os.getenv('PORT', 8501))
     MAX_SITEMAP_PAGES = int(os.getenv('MAX_SITEMAP_PAGES', 200))
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY')

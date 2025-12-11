@@ -1,11 +1,20 @@
+import os
+try:
+    from langchain_groq import ChatGroq
+    HAS_GROQ = True
+except Exception:
+    HAS_GROQ = False
+
 from langchain_openai import ChatOpenAI
 
 class AgentBuilder:
-    def __init__(self, api_key=None, model_name="gpt-4o-mini"):
-        self.api_key = api_key
-        self.model_name = model_name
+    def __init__(self):
+        self.groq_key = os.getenv("GROQ_API_KEY")
+        self.openai_key = os.getenv("OPENAI_API_KEY")
 
     def build(self):
-        if not self.api_key:
-            return None
-        return ChatOpenAI(api_key=self.api_key, model=self.model_name, temperature=0)
+        if self.groq_key and HAS_GROQ:
+            return ChatGroq(api_key=self.groq_key, model="llama3-groq-70b-8192", temperature=0)
+        if self.openai_key:
+            return ChatOpenAI(api_key=self.openai_key, model="gpt-4o-mini", temperature=0)
+        return None
